@@ -6,6 +6,7 @@ on:
 permissions:
   contents: write
   packages: write
+  id-token: write
 jobs:
   test-and-build:
     runs-on: ubuntu-latest
@@ -40,5 +41,12 @@ jobs:
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add deploy/docker-compose.yml
-          git commit -m "chore: deploy ${{ github.sha }}"
-          git push
+          git diff --cached --quiet || git commit -m "chore: deploy ${{ github.sha }}"
+          git diff --cached --quiet || git push
+      - name: Trigger the deployment receiver
+        env:
+          URL: ${{ vars.DEPLOY_RECEIVER_URL }}
+          AUDIENCE: ${{ vars.DEPLOY_OIDC_AUDIENCE }}
+        run: |
+          token=$(curl --fail-with-body -sS -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=$AUDIENCE" | jq -er .value)
+          curl --fail-with-body --retry 2 --connect-timeout 10 --max-time 30 -X POST -H "Authorization: Bearer $token" "$URL"
