@@ -1,0 +1,1 @@
+{"name":"simple-artifact-publisher","private":true,"type":"module","scripts":{"test":"node test-server.mjs"}}

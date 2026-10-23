@@ -1,0 +1,37 @@
+services:
+  artifact-api:
+    image: ghcr.io/placeholder/simple-artifact-publisher@sha256:placeholder
+    container_name: artifact-api
+    restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    environment:
+      API_TOKEN_SHA256: "${ARTIFACT_API_TOKEN_SHA256}"
+      ARTIFACT_ROOT: /static
+      PUBLIC_BASE_URL: "${PUBLIC_BASE_URL}"
+      DEPLOY_WEBHOOK_URL: "${DEPLOY_WEBHOOK_URL}"
+      GITHUB_OIDC_AUDIENCE: "${GITHUB_OIDC_AUDIENCE}"
+      GITHUB_OIDC_SUBJECT: "${GITHUB_OIDC_SUBJECT}"
+    volumes:
+      - artifact-content:/static:rw
+    networks:
+      - proxy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  artifact-content:
+    external: true
+    name: "${ARTIFACT_CONTENT_VOLUME}"
+
+networks:
+  proxy:
+    external: true
+    name: "${PROXY_NETWORK}"

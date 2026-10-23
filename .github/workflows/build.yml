@@ -1,0 +1,44 @@
+name: build
+on:
+  push:
+    branches: [main]
+    paths-ignore: [deploy/**]
+permissions:
+  contents: write
+  packages: write
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+      - run: npm test
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - id: image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository }}:${{ github.sha }}
+      - name: Pin the deploy manifest to the built image
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}@${{ steps.image.outputs.digest }}
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          path = Path('deploy/docker-compose.yml')
+          text = path.read_text()
+          path.write_text(__import__('re').sub(r'^    image: .*$', f"    image: {os.environ['IMAGE']}", text, flags=__import__('re').M))
+          PY
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add deploy/docker-compose.yml
+          git commit -m "chore: deploy ${{ github.sha }}"
+          git push
