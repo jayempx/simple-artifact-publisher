@@ -1,6 +1,6 @@
 services:
   artifact-api:
-    image: ghcr.io/jayempx/simple-artifact-publisher@sha256:7e7e2376fab4ec7b9fd64f30d4b0d94daa98e509f1ad255f7325c33df1f33196
+    image: ghcr.io/jayempx/simple-artifact-publisher@sha256:f3811da144badc3a199441f801d31a684903ec435ff8478c503cc21584294fde
     container_name: artifact-api
     restart: unless-stopped
     read_only: true
