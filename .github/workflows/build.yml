@@ -41,12 +41,15 @@ jobs:
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add deploy/docker-compose.yml
-          git diff --cached --quiet || git commit -m "chore: deploy ${{ github.sha }}"
-          git diff --cached --quiet || git push
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: deploy ${{ github.sha }}"
+            git push
+          fi
       - name: Trigger the deployment receiver
         env:
           URL: ${{ vars.DEPLOY_RECEIVER_URL }}
           AUDIENCE: ${{ vars.DEPLOY_OIDC_AUDIENCE }}
         run: |
           token=$(curl --fail-with-body -sS -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=$AUDIENCE" | jq -er .value)
+          TOKEN="$token" node -e 'const p=JSON.parse(Buffer.from(process.env.TOKEN.split(".")[1], "base64url")); console.log(JSON.stringify({iss:p.iss,aud:p.aud,sub:p.sub,repository:p.repository,ref:p.ref}))'
           curl --fail-with-body --retry 2 --connect-timeout 10 --max-time 30 -X POST -H "Authorization: Bearer $token" "$URL"
