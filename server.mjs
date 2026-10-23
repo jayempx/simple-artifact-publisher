@@ -155,6 +155,7 @@ async function mutate(id, task) {
 createServer(async (request, response) => {
   try {
     if (request.method === 'GET' && request.url === '/healthz') return json(response, 200, { ok: true });
+    if (request.method === 'GET' && request.url === '/version') return json(response, 200, { buildSha: process.env.BUILD_SHA ?? 'unknown' });
     if (request.method === 'POST' && request.url === '/v1/deploy') return deploy(request, response);
     const match = /^\/v1\/artifacts(?:\/([23456789abcdefghjkmnpqrstuvwxyz]{12}))?$/.exec(request.url ?? '');
     if (!match || !['POST', 'PUT'].includes(request.method ?? '')) return fail(response, 404, 'not found');
