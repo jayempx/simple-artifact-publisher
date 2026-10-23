@@ -31,6 +31,7 @@ jobs:
         env:
           IMAGE: ghcr.io/${{ github.repository }}@${{ steps.image.outputs.digest }}
         run: |
+          git pull --rebase origin main
           python3 - <<'PY'
           from pathlib import Path
           import os
