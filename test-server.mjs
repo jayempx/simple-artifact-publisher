@@ -26,5 +26,6 @@ try {
   const concurrent = await Promise.all(Array.from({ length: 8 }, (_, index) => fetch(`http://127.0.0.1:8080/v1/artifacts/${created.id}`, { method: 'PUT', headers: { ...auth, 'If-Match': `"${updated.revision}"` }, body: zip(`<h1>race ${index}</h1>`) })));
   const statuses = concurrent.map((response) => response.status); if (statuses.filter((status) => status === 200).length !== 1 || statuses.filter((status) => status === 412).length !== 7) throw new Error(`concurrency guard failed: ${statuses}`);
   const served = await readFile(join(root, 'id', created.id, 'index.html'), 'utf8'); if (!/^<h1>race [0-7]<\/h1>$/.test(served)) throw new Error('stable path failed');
-  console.log(JSON.stringify({ passed: true, checks: ['version', 'oidc-rejection', 'create', 'auth', 'crc', 'revision', 'stable-update', 'concurrency'] }));
+  const publicArtifact = await fetch(`http://127.0.0.1:8080/id/${created.id}/`); if (publicArtifact.status !== 200 || !publicArtifact.headers.get('content-security-policy')?.includes("font-src 'self' data: https:") || await publicArtifact.text() !== served) throw new Error('artifact policy failed');
+  console.log(JSON.stringify({ passed: true, checks: ['version', 'oidc-rejection', 'create', 'auth', 'crc', 'revision', 'stable-update', 'concurrency', 'artifact-policy'] }));
 } finally { child.kill(); await rm(root, { recursive: true, force: true }); }

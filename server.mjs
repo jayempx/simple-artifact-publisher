@@ -2,7 +2,7 @@ import { createHash, createPublicKey, randomBytes, timingSafeEqual, verify } fro
 import { createServer } from 'node:http';
 import { inflateRawSync } from 'node:zlib';
 import { mkdir, readFile, rename, rm, symlink, writeFile } from 'node:fs/promises';
-import { join, relative, resolve, sep } from 'node:path';
+import { extname, join, relative, resolve, sep } from 'node:path';
 
 const root = resolve(process.env.ARTIFACT_ROOT ?? '/static');
 const publicBaseUrl = new URL(process.env.PUBLIC_BASE_URL ?? 'http://localhost:8080').toString().replace(/\/$/, '');
@@ -24,6 +24,20 @@ const json = (response, status, body, etag) => {
   });
   response.end(JSON.stringify(body));
 };
+const artifactCsp = "default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https:; img-src 'self' data: https:; connect-src 'none'; form-action 'none'; base-uri 'none'; frame-ancestors 'none'; sandbox allow-scripts allow-downloads";
+const contentTypes = { '.css': 'text/css; charset=utf-8', '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml', '.woff': 'font/woff', '.woff2': 'font/woff2' };
+async function artifact(request, response) {
+  const match = /^\/id\/([23456789abcdefghjkmnpqrstuvwxyz]{12})(?:\/(.*))?$/.exec((request.url ?? '').split('?', 1)[0]);
+  if (!match) return false;
+  const base = resolve(root, 'id', match[1]); const target = resolve(base, match[2] || 'index.html');
+  if (target !== base && !target.startsWith(`${base}${sep}`)) return false;
+  try {
+    const data = await readFile(target);
+    response.writeHead(200, { 'Cache-Control': 'no-store', 'Content-Type': contentTypes[extname(target)] ?? 'application/octet-stream', 'Content-Security-Policy': artifactCsp, 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer' });
+    response.end(data);
+  } catch { fail(response, 404, 'not found'); }
+  return true;
+}
 const fail = (response, status, error) => json(response, status, { error });
 const artifactPath = (id) => /^[23456789abcdefghjkmnpqrstuvwxyz]{12}$/.test(id);
 const inside = (path) => path === root || path.startsWith(`${root}${sep}`);
@@ -156,6 +170,7 @@ createServer(async (request, response) => {
   try {
     if (request.method === 'GET' && request.url === '/healthz') return json(response, 200, { ok: true });
     if (request.method === 'GET' && request.url === '/version') return json(response, 200, { buildSha: process.env.BUILD_SHA ?? 'unknown' });
+    if (request.method === 'GET' && await artifact(request, response)) return;
     if (request.method === 'POST' && request.url === '/v1/deploy') return deploy(request, response);
     const match = /^\/v1\/artifacts(?:\/([23456789abcdefghjkmnpqrstuvwxyz]{12}))?$/.exec(request.url ?? '');
     if (!match || !['POST', 'PUT'].includes(request.method ?? '')) return fail(response, 404, 'not found');
